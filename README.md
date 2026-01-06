@@ -1,7 +1,49 @@
-# BEA → BAD (Python / PyMC)
-Reproducible **BEA-like (Bayesian eruption age)** → **BAD-like (Bayesian age–depth)** workflow in Python, following the modeling logic used in Dai et al. (coupled eruption-age inference from single-zircon U–Pb data, then an age–depth model using those eruption ages as tie points).
+# BayesianDepage (Python / PyMC)
 
-> This repository provides a practical, open, and editable implementation. It aims to reproduce the *workflow and result behavior* (e.g., age–depth curve with credible intervals), not necessarily a bit-for-bit match to any proprietary/author-specific code.
+**A reproducible BEA-like (Bayesian eruption age) → BAD-like (Bayesian age–depth) workflow** for single-zircon U–Pb datasets, implemented in Python with **PyMC**.
+
+- **BEA-like:** infer eruption age from a population of zircon ages with analytical uncertainty (allowing older inherited/crystallization ages).
+- **BAD-like:** build a monotonic age–depth model using eruption-age tie points (with optional depth uncertainty) and return credible intervals.
+
+> Goal: reproduce the **workflow and result behavior** (e.g., age–depth curve with credible intervals) used in Dai et al., not necessarily a bit-for-bit match to any author-specific/private implementation.
+
+---
+
+## At a glance
+
+- ✅ Works with **CSV** inputs (`zircon.csv`, `tiepoints.csv`)
+- ✅ Outputs summary tables + a publication-ready **age–depth plot**
+- ✅ Can be packaged as a **Windows GUI .exe** (PyInstaller)
+
+---
+
+## Updates & release notes
+
+**Last updated:** 2026-01-06  
+**Current version:** v0.1.0
+
+### Changelog
+- **v0.1.0 (2026-01-06)**  
+  - Initial BEA→BAD pipeline (PyMC/NUTS)
+  - Bootstrapped prior option for BEA
+  - Monotonic BAD with optional depth uncertainty (default 0.03 m)
+  - CSV outputs + age–depth figure
+
+> Tip: When you publish on GitHub, copy this section into your Release notes and keep the changelog here in sync.
+
+---
+
+## Table of contents
+
+- [Project layout](#project-layout)  
+- [Quickstart](#quickstart)  
+- [Inputs](#inputs)  
+- [Depth sign convention](#depth-sign-convention)  
+- [Outputs](#outputs)  
+- [Windows GUI app (PyInstaller)](#windows-gui-app-pyinstaller)  
+- [Troubleshooting](#troubleshooting)  
+- [Model notes](#model-notes)  
+- [Citation / acknowledgement](#citation--acknowledgement)
 
 ---
 
@@ -25,7 +67,9 @@ bea_bad_project/
 
 ---
 
-## Dependencies
+## Quickstart
+
+### 1) Install dependencies
 
 Recommended (conda):
 
@@ -35,34 +79,34 @@ conda activate bea
 pip install numpy pandas pymc arviz matplotlib scipy
 ```
 
-### Speed note (PyTensor / C++ compiler)
-If you see warnings like:
+### 2) Run the pipeline
 
-- `g++ not detected! PyTensor will be unable to compile C-implementations...`
+From the project root (the directory that contains the `bea_bad/` folder):
 
-the code will still run, but sampling can be **much slower**.
-
-**Windows + conda (recommended):**
 ```bash
-conda install -c conda-forge m2w64-toolchain
+python -m bea_bad --zircon zircon_depthdown.csv --tiepoints tiepoints_depthdown.csv --outdir out
 ```
 
-Verify:
-```bash
-g++ --version
+### Optional: query ages at specific depths
+
+Create `query_depths.csv`:
+
+```csv
+depth_m
+10
+20
+30
 ```
 
-**Optional: suppress compilation attempts (does not speed up, only silences warnings)**
+Run:
 
-PowerShell:
-```powershell
-$env:PYTENSOR_FLAGS="cxx="
-python -m bea_bad --zircon ... --tiepoints ... --outdir out
+```bash
+python -m bea_bad --zircon zircon_depthdown.csv --tiepoints tiepoints_depthdown.csv --query query_depths.csv --outdir out
 ```
 
 ---
 
-## Input data formats
+## Inputs
 
 ### (1) `zircon.csv` (single-zircon U–Pb ages; one row per grain)
 
@@ -76,6 +120,7 @@ Recommended columns:
 - `is_discordant` / `omit_flag` : if you already filtered discordant grains
 
 Example:
+
 ```csv
 ash_id,zircon_id,age_ma,sigma_ma
 Gujiao:GJ-ASH-10,GJ10_z4s,251.710,0.0465
@@ -83,6 +128,7 @@ Gujiao:GJ-ASH-10,GJ10_z4s,251.710,0.0465
 ```
 
 If your uncertainties are given as **2σ**, convert before running:
+
 - `sigma_ma = age_2sigma_ma / 2`
 
 ### (2) `tiepoints.csv` (one row per ash bed)
@@ -95,6 +141,7 @@ Optional:
 - `depth_sigma_m` : depth uncertainty (default used by this workflow is **0.03 m ≈ 3 cm**)
 
 Example:
+
 ```csv
 ash_id,depth_m,depth_sigma_m
 Gujiao:GJ-ASH-10,50.8,0.03
@@ -103,7 +150,7 @@ Gujiao:GJ-ASH-10,50.8,0.03
 
 ---
 
-## Critical: depth sign convention
+## Depth sign convention
 
 The current BAD implementation assumes:
 
@@ -115,39 +162,13 @@ convert to downward-positive before modeling:
 
 - `depth_down_m = -depth_m`
 
-The provided example files `zircon_depthdown.csv` and `tiepoints_depthdown.csv`
-are already converted to **downward-positive** depths.
+The example files `zircon_depthdown.csv` and `tiepoints_depthdown.csv` are already converted to **downward-positive** depths.
 
 ---
 
-## Run the workflow
+## Outputs
 
-From the project root (the directory that contains the `bea_bad/` folder):
-
-```bash
-python -m bea_bad --zircon zircon_depthdown.csv --tiepoints tiepoints_depthdown.csv --outdir out
-```
-
-### Optional: query ages at specific depths
-Create `query_depths.csv`:
-
-```csv
-depth_m
-10
-20
-30
-```
-
-Run:
-```bash
-python -m bea_bad --zircon zircon_depthdown.csv --tiepoints tiepoints_depthdown.csv --query query_depths.csv --outdir out
-```
-
----
-
-## Outputs (in `out/`)
-
-After a successful run you will get:
+After a successful run, `out/` will contain:
 
 - `bea_eruption_age_summary.csv`  
   BEA-like eruption-age estimates per ash bed (mean, sd, 95% interval, n grains used)
@@ -166,12 +187,43 @@ After a successful run you will get:
 
 ---
 
-## Common issues
+## Windows GUI app (PyInstaller)
+
+If you want a **double-clickable Windows GUI (.exe)**:
+
+1) Create a packaging environment (recommended):
+
+```bat
+conda create -n bea_pack python=3.11
+conda activate bea_pack
+pip install numpy pandas pymc arviz matplotlib scipy
+pip install pyinstaller
+```
+
+2) Add a GUI entry file `app_gui.py` (Tkinter) that calls the pipeline.
+
+3) Build the executable from the project root:
+
+```bat
+python -m PyInstaller --noconfirm --onefile --windowed --name BEA_BAD app_gui.py
+```
+
+Output:
+- `dist\BEA_BAD.exe`
+
+> Notes:
+> - Scientific stacks can produce large executables (hundreds of MB). This is normal.
+> - `--onefile` is convenient, but a folder build (no `--onefile`) is sometimes more stable for distribution.
+
+---
+
+## Troubleshooting
 
 ### 1) `No module named bea_bad`
-You must run from the directory that contains the `bea_bad/` package folder, and that folder must contain `__init__.py` and `__main__.py`.
+Run from the directory that contains the `bea_bad/` folder and ensure it has `__init__.py` and `__main__.py`.
 
 Correct command pattern:
+
 ```bash
 python -m bea_bad --zircon ... --tiepoints ... --outdir out
 ```
@@ -179,14 +231,19 @@ python -m bea_bad --zircon ... --tiepoints ... --outdir out
 ### 2) Age–depth curve goes the “wrong way” (deeper becomes younger)
 This is almost always the **depth sign convention**. Ensure your depths are downward-positive (see above).
 
-### 3) Sampling is extremely slow
-Install a compiler toolchain (see “Speed note”), then restart your terminal and rerun.
+### 3) Sampling is extremely slow (PyTensor compiler warnings)
+If you see warnings about missing `g++`, the model will still run but can be slower.
+On Windows + conda, you can install a toolchain:
+
+```bash
+conda install -c conda-forge m2w64-toolchain
+```
 
 ---
 
-## Notes on model choices (high-level)
+## Model notes
 
-- **BEA-like:** eruption age `E` is inferred from a set of zircon ages with analytical uncertainty, allowing grains to be older than eruption (a positive offset term). A **bootstrapped prior** (from resampling “youngest plausible ages”) is supported to stabilize inference.
+- **BEA-like:** eruption age `E` is inferred from zircon ages with analytical uncertainty, allowing grains to be older than eruption (a positive offset term). A **bootstrapped prior** (from resampling “youngest plausible ages”) is supported to stabilize inference.
 - **BAD-like:** tie-point eruption ages (from BEA) are combined with stratigraphic depths (with optional depth uncertainty) under a monotonic, positive-rate age–depth model to produce an age–depth curve with credible intervals.
 
 ---

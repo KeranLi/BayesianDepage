@@ -26,6 +26,7 @@ def main():
     ap.add_argument("--bad_draws", type=int, default=3000)
     ap.add_argument("--bad_tune", type=int, default=3000)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--target_accept", type=float, default=0.9)
 
     args = ap.parse_args()
     ensure_dir(args.outdir)
@@ -44,7 +45,8 @@ def main():
             max_span_ma=args.max_span_ma,
             draws=args.bea_draws,
             tune=args.bea_tune,
-            seed=args.seed
+            seed=args.seed,
+            target_accept=args.target_accept
         )
         rows.append(res.__dict__)
 
@@ -63,6 +65,7 @@ def main():
         draws=args.bad_draws,
         tune=args.bad_tune,
         seed=args.seed,
+        target_accept=args.target_accept,
         outdir=args.outdir
     )
 
